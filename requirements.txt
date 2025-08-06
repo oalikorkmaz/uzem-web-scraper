@@ -1,0 +1,8 @@
+Flask
+selenium
+celery
+redis
+openpyxl
+gevent
+
+

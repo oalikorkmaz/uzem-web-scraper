@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # 1. Redis Servisi
+  redis:
+    image: "redis:alpine" # Hafif bir Redis imajı kullanıyoruz.
+    ports:
+      - "6379:6379" # Windows'taki 6379 portunu Redis konteynerindeki 6379'a bağlıyoruz.
+
+  # 2. Selenium Chrome Servisi
+  # Bu konteyner içinde Chrome ve ChromeDriver hazır kurulu gelir.
+  selenium_chrome:
+    image: selenium/standalone-chrome:latest
+    shm_size: 2g # Chrome'un daha stabil çalışması için paylaşılan hafızayı artırıyoruz.
+    ports:
+      - "4444:4444" # Selenium'un dinlediği port
+      - "7900:7900" # VNC ile tarayıcıyı canlı izlemek için (opsiyonel)
+
+  # 3. Flask Web Uygulaması Servisi
+  app:
+    build: . # Yukarıda oluşturduğumuz Dockerfile'ı kullanarak bu servisi inşa et.
+    ports:
+      - "5000:5000" # Windows 5000 portunu Flask konteyner 5000'e bağla.
+    volumes:
+      - .:/app # Yerel proje klasörünü konteynerdeki /app klasörüyle senkronize et.
+               # Bu sayede kodda yaptığın değişiklikler anında konteynere yansır.
+    environment:
+      - FLASK_ENV=development
+    depends_on:
+      - redis
+      - selenium_chrome # Flask'ı başlatmadan önce Redis ve Selenium'un başlamasını bekle.
+
+  # 4. Celery İşçisi Servisi
+  celery:
+    build: . # Flask ile aynı imajı kullanır.
+    command: python -m celery -A tasks.celery_app worker --loglevel=info -P gevent # Konteyner başlayınca bu komutu çalıştır.
+    volumes:
+      - .:/app # Kod senkronizasyonu için.
+    depends_on:
+      - app # Celery'yi başlatmadan önce app (ve dolayısıyla diğerlerinin) başlamasını bekle.

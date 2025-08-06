@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UZEM DOYK Veri Çekme Sistemi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 1200px;
+            margin: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .login-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .settings-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+        }
+
+        .settings-header {
+            padding: 20px 30px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 13px 13px 0 0;
+            transition: background 0.3s ease;
+        }
+
+        .settings-header:hover {
+            background: linear-gradient(45deg, #5a6fd8, #6a42a0);
+        }
+
+        .settings-header h3 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+
+        .settings-content {
+            padding: 30px;
+            display: none;
+        }
+
+        .settings-content.active {
+            display: block;
+        }
+
+        .language-settings {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .language-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .language-item label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .language-item input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(45deg, #5a6fd8, #6a42a0);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid #e9ecef;
+        }
+
+        .status-section h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .log-area {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .results-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            border: 1px solid #e9ecef;
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .results-table th,
+        .results-table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .results-table th {
+            background: #f1f3f5;
+            color: #495057;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+        
+        .results-table td {
+            font-size: 14px;
+        }
+
+        .results-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .results-table tr:hover {
+            background: #e9ecef;
+        }
+
+        .cell-warning {
+            background-color: #ffebee !important;
+            color: #c62828;
+            font-weight: bold;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .download-section {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .download-btn {
+            background: linear-gradient(45deg, #4caf50, #45a049);
+            color: white;
+        }
+
+        .download-btn:hover {
+            background: linear-gradient(45deg, #45a049, #3d8b40);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(76, 175, 80, 0.3);
+        }
+
+        .arrow {
+            transition: transform 0.3s ease;
+        }
+
+        .arrow.rotated {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            .header h1 {
+                font-size: 2em;
+            }
+            .language-settings {
+                grid-template-columns: 1fr;
+            }
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 UZEM DOYK Veri Çekme Sistemi</h1>
+            <p>Dil seviyelerine göre kaynak analizi ve Excel raporlama</p>
+        </div>
+
+        <div class="login-section">
+            <h3 style="margin-bottom: 20px; color: #333;">🔐 Giriş Bilgileri</h3>
+            <div class="form-group">
+                <label for="username">Kullanıcı Adı:</label>
+                <input type="text" id="username" name="username" placeholder="Kullanıcı adınızı girin" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Şifre:</label>
+                <input type="password" id="password" name="password" placeholder="Şifrenizi girin" required>
+            </div>
+        </div>
+
+        <div class="settings-panel">
+            <div class="settings-header" onclick="toggleSettings()">
+                <h3>⚙️ Minimum Değer Ayarları</h3>
+                <span class="arrow">▼</span>
+            </div>
+            <div class="settings-content" id="settingsContent">
+                <p style="color:#666; margin-bottom:20px;">Tabloda, her bir dil için belirlenen minimum değerin altındaki kaynak sayıları kırmızı ile işaretlenecektir.</p>
+                <div class="language-settings">
+                    <div class="language-item">
+                        <label for="almanca-min">Almanca Minimum:</label>
+                        <input type="number" id="almanca-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="ingilizce-min">İngilizce Minimum:</label>
+                        <input type="number" id="ingilizce-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="fransizca-min">Fransızca Minimum:</label>
+                        <input type="number" id="fransizca-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="rusca-min">Rusça Minimum:</label>
+                        <input type="number" id="rusca-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="dogu/balkan-min">Doğu / Balkan Minimum:</label>
+                        <input type="number" id="dogu/balkan-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="ispanyolca-min">İspanyolca Minimum:</label>
+                        <input type="number" id="ispanyolca-min" value="42" min="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-primary" onclick="startScraping()" id="scrapeBtn">
+                🚀 Veri Çekmeyi Başlat
+            </button>
+            <button class="btn btn-secondary" onclick="resetForm()" id="resetBtn">
+                🔄 Sıfırla
+            </button>
+        </div>
+
+        <div class="status-section">
+            <h3>📊 İşlem Durumu</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="log-area" id="logArea">Sistem hazır. Veri çekme işlemini başlatmak için yukarıdaki butona tıklayın.</div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <h3>📈 Sonuçlar</h3>
+            <div id="resultsContent" style="overflow-x:auto;"></div>
+            <div class="download-section">
+                <button class="btn download-btn" id="downloadBtn" onclick="downloadExcel()" disabled>
+                    📥 Excel Dosyası İndir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scrapedData = null;
+        let currentTaskId = null;
+        let pollingInterval = null;
+
+        function toggleSettings() {
+            const content = document.getElementById('settingsContent');
+            const arrow = document.querySelector('.arrow');
+            content.classList.toggle('active');
+            arrow.classList.toggle('rotated');
+        }
+
+        function resetForm() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('logArea').innerHTML = '<div>Sistem hazır. Veri çekme işlemini başlatmak için yukarıdaki butona tıklayın.</div>';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('resultsSection').classList.remove('active');
+            document.getElementById('resultsContent').innerHTML = '';
+            document.getElementById('downloadBtn').disabled = true;
+            scrapedData = null;
+            currentTaskId = null;
+            updateButtonStates(false);
+        }
+
+        function updateButtonStates(isScraping) {
+            const scrapeBtn = document.getElementById('scrapeBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            scrapeBtn.disabled = isScraping;
+            resetBtn.disabled = isScraping;
+            if (isScraping) {
+                scrapeBtn.innerHTML = '<span class="loading-spinner"></span>İşlem Devam Ediyor...';
+            } else {
+                scrapeBtn.innerHTML = '🚀 Veri Çekmeyi Başlat';
+            }
+        }
+
+        function addLog(message, type = 'info') {
+            const logArea = document.getElementById('logArea');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            if (type === 'error') {
+                logEntry.style.color = '#ff6b6b';
+            } else if (type === 'success') {
+                logEntry.style.color = '#51cf66';
+            }
+            logArea.appendChild(logEntry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function updateProgress(percentage) {
+            document.getElementById('progressFill').style.width = `${percentage}%`;
+        }
+
+        
+        function getMinimumValues() {
+            const languages = ['almanca', 'ingilizce', 'fransizca', 'rusca', 'dogu/balkan', 'ispanyolca'];
+            const values = {};
+            const langMap = {'almanca': 'Almanca', 'ingilizce': 'İngilizce', 'fransizca': 'Fransızca', 'rusca': 'Rusça', 'dogu/balkan': 'Doğu/Balkan Dilleri', 'ispanyolca': 'İspanyolca/İtalyanca'};
+            languages.forEach(lang => {
+                const key = langMap[lang];
+                values[key] = parseInt(document.getElementById(`${lang}-min`).value) || 42;
+            });
+            return values;
+        }
+
+        async function startScraping() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            if (!username || !password) {
+                addLog('Hata: Kullanıcı adı ve şifre girilmesi zorunludur.', 'error');
+                return;
+            }
+
+            resetForm();
+            updateButtonStates(true);
+            document.getElementById('logArea').innerHTML = '';
+            addLog('İstek sunucuya gönderiliyor...', 'info');
+
+            const minimumValues = getMinimumValues();
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('password', password);
+            formData.append('minimum_values', JSON.stringify(minimumValues));
+
+            try {
+                const response = await fetch('/start-scrape', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error(`Sunucu hatası: ${response.statusText}`);
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                currentTaskId = data.task_id;
+                addLog(`Görev başarıyla oluşturuldu (ID: ${currentTaskId}). Durum takip ediliyor...`, 'success');
+                pollingInterval = setInterval(pollTaskStatus, 2000);
+            } catch (error) {
+                addLog(`Kritik Hata: ${error.message}`, 'error');
+                updateButtonStates(false);
+            }
+        }
+
+        async function pollTaskStatus() {
+            if (!currentTaskId) return;
+            try {
+                const response = await fetch(`/task-status/${currentTaskId}`);
+                if (!response.ok) throw new Error('Durum sunucusuna ulaşılamadı.');
+                const data = await response.json();
+
+                if (data.state === 'PROGRESS') {
+                    updateProgress(data.progress);
+                    addLog(data.log_message);
+                    document.getElementById('scrapeBtn').innerHTML = `<span class="loading-spinner"></span>${data.log_message.substring(0, 25)}...`;
+                } else if (data.state === 'SUCCESS') {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    updateProgress(100);
+                    addLog('İşlem başarıyla tamamlandı!', 'success');
+                    scrapedData = data.result.data;
+                    displayResults();
+                    const downloadBtn = document.getElementById('downloadBtn');
+                    downloadBtn.disabled = false;
+                    downloadBtn.setAttribute('data-filename', data.result.excel_filename);
+                    updateButtonStates(false);
+                } else if (data.state === 'FAILURE') {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    updateProgress(0);
+                    addLog(`Hata: ${data.log_message}`, 'error');
+                    updateButtonStates(false);
+                }
+            } catch (error) {
+                addLog(`Durum sorgulanırken hata: ${error.message}`, 'error');
+                clearInterval(pollingInterval);
+                updateButtonStates(false);
+            }
+        }
+
+        function displayResults() {
+            const resultsContent = document.getElementById('resultsContent');
+            const minimumValues = getMinimumValues();
+            
+            let html = '<table class="results-table"><thead><tr><th>Dil</th><th>Seviye</th><th>D</th><th>O</th><th>Y</th><th>K</th></tr></thead><tbody>';
+            
+            if (!scrapedData || Object.keys(scrapedData).length === 0) {
+                 html += '<tr><td colspan="6">Görüntülenecek veri bulunamadı.</td></tr>';
+            } else {
+                 Object.keys(scrapedData).forEach(language => {
+                    const levelData = scrapedData[language];
+                    const levels = Object.keys(levelData).sort((a, b) => {
+                        const levelA = parseInt(a.match(/\d+/)?.[0] || 0);
+                        const levelB = parseInt(b.match(/\d+/)?.[0] || 0);
+                        const charA = a.match(/[A-Za-z]+/)?.[0] || '';
+                        const charB = b.match(/[A-Za-z]+/)?.[0] || '';
+                        if (charA < charB) return -1;
+                        if (charA > charB) return 1;
+                        return levelA - levelB;
+                    });
+                    const minValue = minimumValues[language] || 42;
+                    
+                    levels.forEach((level, index) => {
+                        const skills = levelData[level];
+                        html += `<tr>`;
+                        if (index === 0) {
+                            html += `<td rowspan="${levels.length}" style="vertical-align: middle; font-weight: bold;">${language}</td>`;
+                        }
+                        html += `<td>${level}</td>`;
+                        ['D', 'O', 'Y', 'K'].forEach(skill => {
+                            const value = skills[skill] || 0;
+                            const cellClass = value < minValue ? 'cell-warning' : '';
+                            html += `<td class="${cellClass}">${value}</td>`;
+                        });
+                        html += `</tr>`;
+                    });
+                });
+            }
+            
+            html += '</tbody></table>';
+            resultsContent.innerHTML = html;
+            document.getElementById('resultsSection').classList.add('active');
+        }
+
+        function downloadExcel() {
+            const filename = document.getElementById('downloadBtn').getAttribute('data-filename');
+            if (!filename) {
+                addLog('Hata: İndirilecek dosya adı bulunamadı.', 'error');
+                return;
+            }
+            window.location.href = `/download/${filename}`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            resetForm();
+        });
+    </script>
+</body>
+</html>
