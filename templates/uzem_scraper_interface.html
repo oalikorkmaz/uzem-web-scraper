@@ -150,6 +150,24 @@
             font-size: 14px;
         }
 
+        .language-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .checkbox-item {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
         .button-group {
             display: flex;
             gap: 15px;
@@ -375,7 +393,7 @@
         <div class="settings-panel">
             <div class="settings-header" onclick="toggleSettings()">
                 <h3>⚙️ Minimum Değer Ayarları</h3>
-                <span class="arrow">▼</span>
+                <span class="arrow" id="settingsArrow">▼</span>
             </div>
             <div class="settings-content" id="settingsContent">
                 <p style="color:#666; margin-bottom:20px;">Tabloda, her bir dil için belirlenen minimum değerin altındaki kaynak sayıları kırmızı ile işaretlenecektir.</p>
@@ -404,6 +422,33 @@
                         <label for="ispanyolca-min">İspanyolca Minimum:</label>
                         <input type="number" id="ispanyolca-min" value="42" min="0">
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-panel">
+            <div class="settings-header" onclick="toggleLanguageSelect()">
+                <h3>🌐 Analiz Edilecek Dilleri Seçin</h3>
+                <span class="arrow" id="languageSelectArrow">▼</span>
+            </div>
+            <div class="settings-content" id="languageSelectContent">
+                <div class="language-checkboxes">
+                    <label class="checkbox-item"><input type="checkbox" id="lang-almanca" checked> Almanca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-ingilizce" checked> İngilizce</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-fransizca" checked> Fransızca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-rusca" checked> Rusça</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-dogu-balkan" checked> Doğu/Balkan</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-ispanyolca" checked> İspanyolca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-italyanca" checked> İtalyanca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-portekizce" checked> Portekizce</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-cince" checked> Çince</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-japonca" checked> Japonca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-korece" checked> Korece</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-arapca" checked> Arapça</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-farsca" checked> Farsça</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-yunanca" checked> Yunanca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-hintce" checked> Hintçe</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-turkce" checked> Türkçe</label>
                 </div>
             </div>
         </div>
@@ -443,9 +488,29 @@
 
         function toggleSettings() {
             const content = document.getElementById('settingsContent');
-            const arrow = document.querySelector('.arrow');
+            const arrow = document.getElementById('settingsArrow');
             content.classList.toggle('active');
             arrow.classList.toggle('rotated');
+        }
+
+        function toggleLanguageSelect() {
+            const content = document.getElementById('languageSelectContent');
+            const arrow = document.getElementById('languageSelectArrow');
+            content.classList.toggle('active');
+            arrow.classList.toggle('rotated');
+        }
+
+        function loadMinimumValues() {
+            const inputs = document.querySelectorAll('.language-item input');
+            inputs.forEach(input => {
+                const stored = localStorage.getItem(input.id);
+                if (stored !== null) {
+                    input.value = stored;
+                }
+                input.addEventListener('change', () => {
+                    localStorage.setItem(input.id, input.value);
+                });
+            });
         }
 
         function resetForm() {
@@ -631,6 +696,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            loadMinimumValues();
             resetForm();
         });
     </script>
