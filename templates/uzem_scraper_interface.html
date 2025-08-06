@@ -150,6 +150,24 @@
             font-size: 14px;
         }
 
+        .language-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .checkbox-item {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
         .button-group {
             display: flex;
             gap: 15px;
@@ -375,7 +393,7 @@
         <div class="settings-panel">
             <div class="settings-header" onclick="toggleSettings()">
                 <h3>⚙️ Minimum Değer Ayarları</h3>
-                <span class="arrow">▼</span>
+                <span class="arrow" id="settingsArrow">▼</span>
             </div>
             <div class="settings-content" id="settingsContent">
                 <p style="color:#666; margin-bottom:20px;">Tabloda, her bir dil için belirlenen minimum değerin altındaki kaynak sayıları kırmızı ile işaretlenecektir.</p>
@@ -397,13 +415,80 @@
                         <input type="number" id="rusca-min" value="42" min="0">
                     </div>
                     <div class="language-item">
-                        <label for="dogu/balkan-min">Doğu / Balkan Minimum:</label>
-                        <input type="number" id="dogu/balkan-min" value="42" min="0">
+                        <label for="bulgarca-min">Bulgarca Minimum:</label>
+                        <input type="number" id="bulgarca-min" value="42" min="0">
                     </div>
                     <div class="language-item">
                         <label for="ispanyolca-min">İspanyolca Minimum:</label>
                         <input type="number" id="ispanyolca-min" value="42" min="0">
                     </div>
+                    <div class="language-item">
+                        <label for="italyanca-min">İtalyanca Minimum:</label>
+                        <input type="number" id="italyanca-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="portekizce-min">Portekizce Minimum:</label>
+                        <input type="number" id="portekizce-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="cince-min">Çince Minimum:</label>
+                        <input type="number" id="cince-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="japonca-min">Japonca Minimum:</label>
+                        <input type="number" id="japonca-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="korece-min">Korece Minimum:</label>
+                        <input type="number" id="korece-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="arapca-min">Arapça Minimum:</label>
+                        <input type="number" id="arapca-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="farsca-min">Farsça Minimum:</label>
+                        <input type="number" id="farsca-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="yunanca-min">Yunanca Minimum:</label>
+                        <input type="number" id="yunanca-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="hintce-min">Hintçe Minimum:</label>
+                        <input type="number" id="hintce-min" value="42" min="0">
+                    </div>
+                    <div class="language-item">
+                        <label for="turkce-min">Türkçe Minimum:</label>
+                        <input type="number" id="turkce-min" value="42" min="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-panel">
+            <div class="settings-header" onclick="toggleLanguageSelect()">
+                <h3>🌐 Analiz Edilecek Dilleri Seçin</h3>
+                <span class="arrow" id="languageSelectArrow">▼</span>
+            </div>
+            <div class="settings-content" id="languageSelectContent">
+                <div class="language-checkboxes">
+                    <label class="checkbox-item"><input type="checkbox" id="lang-almanca" checked> Almanca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-ingilizce" checked> İngilizce</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-fransizca" checked> Fransızca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-rusca" checked> Rusça</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-bulgarca" checked> Bulgarca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-ispanyolca" checked> İspanyolca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-italyanca" checked> İtalyanca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-portekizce" checked> Portekizce</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-cince" checked> Çince</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-japonca" checked> Japonca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-korece" checked> Korece</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-arapca" checked> Arapça</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-farsca" checked> Farsça</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-yunanca" checked> Yunanca</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-hintce" checked> Hintçe</label>
+                    <label class="checkbox-item"><input type="checkbox" id="lang-turkce" checked> Türkçe</label>
                 </div>
             </div>
         </div>
@@ -443,9 +528,29 @@
 
         function toggleSettings() {
             const content = document.getElementById('settingsContent');
-            const arrow = document.querySelector('.arrow');
+            const arrow = document.getElementById('settingsArrow');
             content.classList.toggle('active');
             arrow.classList.toggle('rotated');
+        }
+
+        function toggleLanguageSelect() {
+            const content = document.getElementById('languageSelectContent');
+            const arrow = document.getElementById('languageSelectArrow');
+            content.classList.toggle('active');
+            arrow.classList.toggle('rotated');
+        }
+
+        function loadMinimumValues() {
+            const inputs = document.querySelectorAll('.language-item input');
+            inputs.forEach(input => {
+                const stored = localStorage.getItem(input.id);
+                if (stored !== null) {
+                    input.value = stored;
+                }
+                input.addEventListener('change', () => {
+                    localStorage.setItem(input.id, input.value);
+                });
+            });
         }
 
         function resetForm() {
@@ -497,9 +602,26 @@
 
         
         function getMinimumValues() {
-            const languages = ['almanca', 'ingilizce', 'fransizca', 'rusca', 'dogu/balkan', 'ispanyolca'];
+            const languages = ['almanca', 'ingilizce', 'fransizca', 'rusca', 'bulgarca', 'ispanyolca', 'italyanca', 'portekizce', 'cince', 'japonca', 'korece', 'arapca', 'farsca', 'yunanca', 'hintce', 'turkce'];
             const values = {};
-            const langMap = {'almanca': 'Almanca', 'ingilizce': 'İngilizce', 'fransizca': 'Fransızca', 'rusca': 'Rusça', 'dogu/balkan': 'Doğu/Balkan Dilleri', 'ispanyolca': 'İspanyolca/İtalyanca'};
+            const langMap = {
+                'almanca': 'Almanca',
+                'ingilizce': 'İngilizce',
+                'fransizca': 'Fransızca',
+                'rusca': 'Rusça',
+                'bulgarca': 'Bulgarca',
+                'ispanyolca': 'İspanyolca',
+                'italyanca': 'İtalyanca',
+                'portekizce': 'Portekizce',
+                'cince': 'Çince',
+                'japonca': 'Japonca',
+                'korece': 'Korece',
+                'arapca': 'Arapça',
+                'farsca': 'Farsça',
+                'yunanca': 'Yunanca',
+                'hintce': 'Hintçe',
+                'turkce': 'Türkçe'
+            };
             languages.forEach(lang => {
                 const key = langMap[lang];
                 values[key] = parseInt(document.getElementById(`${lang}-min`).value) || 42;
@@ -631,6 +753,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            loadMinimumValues();
             resetForm();
         });
     </script>
