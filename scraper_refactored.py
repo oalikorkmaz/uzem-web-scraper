@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
+
 import time
 
 class UzemScraper:
@@ -24,29 +25,44 @@ class UzemScraper:
             options = webdriver.ChromeOptions()
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--headless=new')  # Headless
+            options.page_load_strategy = 'none'     # Tam yüklemeyi bekleme
 
-            # --- YENİ EKLENEN OPTİMİZASYON AYARLARI ---
-
-            # 1. Tarayıcının arka planda yaptığı gereksiz ağ isteklerini kapatıyoruz.
+            # Arka plan ağ istekleri vs.
             options.add_argument('--disable-background-networking')
             options.add_argument('--disable-sync')
             options.add_argument('--disable-component-update')
             options.add_argument('--disable-default-apps')
             options.add_argument('--no-pings')
-            options.add_argument("--disable-domain-reliability")
-            options.add_argument("--disable-features=OptimizationHints,MediaRouter")
+            options.add_argument('--disable-domain-reliability')
+            options.add_argument('--disable-features=OptimizationHints,MediaRouter')
 
-            # 2. En büyük bant genişliği tasarrufu: Resimlerin yüklenmesini engelliyoruz.
-            # 0: Varsayılan, 1: İzin Ver, 2: Engelle
-            prefs = {"profile.managed_default_content_settings.images": 2}
+            # Görselleri kapat (ek)
+            prefs = {
+                "profile.managed_default_content_settings.images": 2,
+                "profile.managed_default_content_settings.plugins": 2,
+            }
             options.add_experimental_option("prefs", prefs)
-            
-            # --- OPTİMİZASYON AYARLARI BİTTİ ---
 
             self.driver = webdriver.Remote(
-            command_executor='http://selenium_chrome:4444/wd/hub',
-            options=options
+                command_executor='http://selenium_chrome:4444/wd/hub',
+                options=options
             )
+
+            # CDP: Ağ filtreleri
+            self.driver.execute_cdp_cmd('Network.enable', {})
+            self.driver.execute_cdp_cmd('Network.setBlockedURLs', {
+                'urls': [
+                    '*.png','*.jpg','*.jpeg','*.gif','*.webp','*.svg','*.ico',
+                    '*.mp4','*.webm','*.mp3','*.wav','*.ogg',
+                    '*.woff','*.woff2','*.ttf','*.otf',
+                    '*.css',
+                    '*googletagmanager*','*google-analytics*','*doubleclick*',
+                    '*facebook*','*hotjar*','*sentry*','*clarity*','*newrelic*','*datadoghq*',
+                    '*gravatar*','*youtube*','*vimeo*'
+                ]
+            })
+
 
             print("Remote WebDriver'a başarıyla bağlanıldı.")
             self.driver.set_page_load_timeout(120)
@@ -182,108 +198,113 @@ class UzemScraper:
 
     def scrape_doyk_content(self, url):
         """
-        Verilen dil seviyesi URL'indeki tüm kursları gezer ve kaynak sayısını çeker.
-        İyileştirilmiş bekleme ve hata ayıklama mekanizmaları içerir.
+        (Yeni) Kurs kartlarını liste sayfasından al, sonra tüm kursları
+        tam gezinmeden fetch+DOMParser ile say.
         """
         if not self.driver:
             print("Hata: WebDriver başlatılmamış.")
             return None
 
-        print(f"\nKurs listesini almak için sayfaya gidiliyor: {url}")
-        
-        try:
-            self.driver.get(url)
-        except Exception as e:
-            print(f"Sayfa yüklenirken hata oluştu: {url} - Hata: {e}")
-            return None # Sayfa hiç yüklenemezse boş liste döndür
+        print(f"\nKurs listesi için sayfaya gidiliyor: {url}")
+        self.driver.get(url)
 
-        wait = WebDriverWait(self.driver, 120) # Bekleme süresi 2 dakika
-        all_courses_with_js_counts = []
-        
+        wait = WebDriverWait(self.driver, 60)
+        # Sayfa tam yüklenmesini beklemeyelim; kartların geldiğini görmek yeterli
         try:
-            # Katman 3: Sayfanın tamamen yüklenmesini bekle
-            print("Sayfanın tamamen yüklenmesi bekleniyor (document.readyState)...")
-            wait.until(lambda d: d.execute_script('return document.readyState') == 'complete')
-            print("Sayfa tamamen yüklendi.")
-
-            # Ana içeriğin (kurs kartlarının) yüklenmesini bekle
-            print(f"'{url}' adresinde kurs kartlarını (.course-cards .card-wrapper) bekliyorum...")
+            wait.until(lambda d: d.execute_script('return document.readyState') in ('interactive','complete'))
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".course-cards .card-wrapper")))
-            
-            # JavaScript ile kurs bilgilerini çekme kısmı
-            course_cards_info_from_page = self.driver.execute_script("""
-                const cards = document.querySelectorAll('.course-cards .card-wrapper');
-                const infoList = [];
-                cards.forEach(card => {
-                    try {
-                        const titleElement = card.querySelector('.coursename');
-                        const url = titleElement ? titleElement.href : '';
-                        const title = titleElement ? titleElement.innerText.trim() : '';
-                        if (url && title) {
-                            infoList.push({title: title, url: url});
-                        }
-                    } catch (e) {
-                        console.error('Kart bilgisi çekilemedi:', e);
-                    }
-                });
-                return infoList;
-            """)
-            
-            if not course_cards_info_from_page:
-                print(f"Uyarı: {url} adresinde JavaScript ile hiç kurs kartı bilgisi toplanamadı.")
-                return []
-            
-            print(f"Toplam {len(course_cards_info_from_page)} adet kurs kartı bilgisi toplandı. Şimdi her birine gidiyorum...")
-
-            # DÖNGÜNÜN DOLDURULMUŞ HALİ
-            for course_info in course_cards_info_from_page:
-                course_title = course_info.get("title", "Başlık Yok")
-                course_url = course_info.get("url")
-
-                if not course_url:
-                    continue
-
-                print(f"    --> Kurs detay sayfasına gidiliyor: {course_title}")
-                self.driver.get(course_url)
-                wait.until(lambda d: d.execute_script('return document.readyState') == 'complete')
-
-                total_count = 0
-                try:
-                    js_code = """
-                        const divCount = document.querySelectorAll('div.h5p-placeholder:not(:has(div.hiddenactivity))').length;
-                        const resourceCount = document.querySelectorAll('li.resource:not(:has(div.hiddenactivity))').length;
-                        const liCount = document.querySelectorAll('li.h5pactivity:not(:has(div.hiddenactivity))').length;
-                        const assignCount = document.querySelectorAll('li.modtype_assign:not(:has(div.hiddenactivity))').length;
-                        return divCount + liCount + resourceCount + assignCount;
-                       """
-                    total_count = self.driver.execute_script(js_code)
-                    print(f"    '{course_title}' için kaynak sayısı: {total_count}")
-                except Exception as js_e: 
-                    print(f"    JavaScript kodu çalıştırılırken hata oluştu: {js_e}")
-
-                combined_course_data = {
-                    "title": course_title,
-                    "url": course_url,
-                    "total_resources_from_js": total_count
-                }
-                all_courses_with_js_counts.append(combined_course_data)
-                time.sleep(1) # Her kurs arası 1 saniye bekle
-            
         except TimeoutException:
-            print(f"ZAMAN AŞIMI: '{url}' adresinde kurs kartları 120 saniye içinde bulunamadı.")
-            print("Sayfanın o anki görüntüsü 'debug_screenshot.png' olarak kaydediliyor.")
-            print("Sayfanın HTML kaynağı 'debug_page_source.html' olarak kaydediliyor.")
-            
-            self.driver.save_screenshot('debug_screenshot.png')
-            with open('debug_page_source.html', 'w', encoding='utf-8') as f:
-                f.write(self.driver.page_source)
-                
-            print("Hata ayıklama dosyaları oluşturuldu.")
-            
-        except Exception as e:
-            print(f"Kurs listesi çekilirken beklenmedik bir genel hata oluştu: {e}")
-            
+            print("Kurs kartları görünmedi, atlanıyor.")
+            return []
+
+        # Liste sayfasında JS ile kurs linklerini al
+        course_cards = self.driver.execute_script("""
+            const cards = document.querySelectorAll('.course-cards .card-wrapper');
+            const info = [];
+            cards.forEach(card => {
+                const a = card.querySelector('.coursename');
+                if (a && a.href) info.push({title: a.innerText.trim(), url: a.href});
+            });
+            return info;
+        """) or []
+
+        if not course_cards:
+            print("Uyarı: Kurs kartı bulunamadı.")
+            return []
+
+        print(f"Toplam {len(course_cards)} kurs bulundu. Fetch ile sayılıyor...")
+        # Tam gezinmeden, sadece HTML çek
+        counted = self.fetch_course_counts_bulk(course_cards, timeout_sec=180, concurrency=6)
+
+        # Dönüş formatını eski kodla uyumlu hale getir
+        all_courses_with_js_counts = []
+        for c in counted:
+            all_courses_with_js_counts.append({
+                "title": c.get("title", ""),
+                "url": c.get("url"),
+                "total_resources_from_js": c.get("total", 0)
+            })
         return all_courses_with_js_counts
+
+    def fetch_course_counts_bulk(self, courses, timeout_sec=120, concurrency=5):
+            """
+            Aynı domain içindeki course URL'lerini tam gezinmeden, sadece HTML getirerek sayar.
+            courses: [{'title':..., 'url':...}, ...]
+            Dönüş: [{'title':..., 'url':..., 'total': int}, ...]
+            """
+            # execute_async_script ile tarayıcı içinde fetch + DOMParser çalıştır
+            js = """
+                const courses = arguments[0];
+                const concurrency = arguments[1] || 5;
+                const callback = arguments[arguments.length - 1];
+
+                const worker = async (items) => {
+                    const results = [];
+                    for (const it of items) {
+                        try {
+                            const r = await fetch(it.url, { credentials: 'include' });
+                            const html = await r.text();
+                            // Dış kaynaklar yüklenmez; sadece metin.
+                            const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                            const h5pDivs   = doc.querySelectorAll('div.h5p-placeholder:not(:has(div.hiddenactivity))').length;
+                            const resources = doc.querySelectorAll('li.resource:not(:has(div.hiddenactivity))').length;
+                            const h5pLis    = doc.querySelectorAll('li.h5pactivity:not(:has(div.hiddenactivity))').length;
+                            const assigns   = doc.querySelectorAll('li.modtype_assign:not(:has(div.hiddenactivity))').length;
+
+                            const total = h5pDivs + resources + h5pLis + assigns;
+                            results.push({ title: it.title || '', url: it.url, total });
+                        } catch(e) {
+                            results.push({ title: it.title || '', url: it.url, total: 0, error: String(e) });
+                        }
+                    }
+                    return results;
+                };
+
+                (async () => {
+                    const buckets = [];
+                    for (let i = 0; i < courses.length; i += concurrency) {
+                        buckets.push(courses.slice(i, i + concurrency));
+                    }
+
+                    const out = [];
+                    for (const b of buckets) {
+                        const chunk = await worker(b);
+                        out.push(...chunk);
+                    }
+                    callback(out);
+                })();
+            """
+            try:
+                WebDriverWait(self.driver, timeout_sec).until(
+                    lambda d: d.execute_script('return document.readyState') in ('interactive','complete')
+                )
+                results = self.driver.execute_async_script(js, courses, concurrency)
+                return results
+            except Exception as e:
+                print("fetch_course_counts_bulk hatası:", e)
+                return []
+
 
     def close_driver(self):
         """WebDriver'ı kapatır."""

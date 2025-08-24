@@ -19,9 +19,10 @@ def start_scrape():
     username = request.form['username']
     password = request.form['password']
     minimum_values = json.loads(request.form['minimum_values'])
-    
+    selected_languages = json.loads(request.form.get('selected_languages', '[]'))
+
     # Celery görevini başlat ve hemen bir görev ID'si al.
-    task = start_scrape_process.delay(username, password, minimum_values)
+    task = start_scrape_process.delay(username, password, minimum_values, selected_languages)
     return jsonify({"task_id": task.id})
 
 # Görevin durumunu sorgulayan endpoint.
@@ -48,9 +49,3 @@ def download(filename):
         return "Geçersiz dosya adı", 400
     
     return send_from_directory(directory='output', path=filename, as_attachment=True)
-
-if __name__ == '__main__':
-    # 'output' klasörü yoksa oluştur
-    if not os.path.exists('output'):
-        os.makedirs('output')
-    app.run(debug=True)

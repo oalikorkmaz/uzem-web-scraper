@@ -462,8 +462,6 @@
                         <label for="yunanca-min">Yunanca Minimum:</label>
                         <input type="number" id="yunanca-min" value="42" min="0">
                     </div>
-
-
                 </div>
             </div>
         </div>
@@ -475,6 +473,12 @@
             </div>
             <div class="settings-content" id="languageSelectContent">
                 <div class="language-checkboxes">
+                    <!-- Tümünü Seç / Kaldır -->
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="select-all-langs"> Tümünü Seç / Kaldır
+                    </label>
+
+                    <!-- Tek tek diller -->
                     <label class="checkbox-item"><input type="checkbox" id="lang-almanca" checked> Almanca</label>
                     <label class="checkbox-item"><input type="checkbox" id="lang-arapca" checked> Arapça</label>
                     <label class="checkbox-item"><input type="checkbox" id="lang-arnavutca" checked> Arnavutça</label>
@@ -602,33 +606,23 @@
             document.getElementById('progressFill').style.width = `${percentage}%`;
         }
 
-        
         function getMinimumValues() {
-            const languages = ['almanca', 'ingilizce', 'fransizca', 'rusca', 'bulgarca', 'ispanyolca', 'italyanca', 'portekizce', 'cince', 'japonca', 'korece', 'arapca', 'farsca', 'yunanca', 'hintce', 'turkce'];
             const values = {};
-            const langMap = {
-                'almanca': 'Almanca',
-                'ingilizce': 'İngilizce',
-                'fransizca': 'Fransızca',
-                'rusca': 'Rusça',
-                'bulgarca': 'Bulgarca',
-                'ispanyolca': 'İspanyolca',
-                'italyanca': 'İtalyanca',
-                'portekizce': 'Portekizce',
-                'cince': 'Çince',
-                'japonca': 'Japonca',
-                'korece': 'Korece',
-                'arapca': 'Arapça',
-                'farsca': 'Farsça',
-                'yunanca': 'Yunanca',
-                'hintce': 'Hintçe',
-                'turkce': 'Türkçe'
-            };
-            languages.forEach(lang => {
-                const key = langMap[lang];
-                values[key] = parseInt(document.getElementById(`${lang}-min`).value) || 42;
+            document.querySelectorAll('.language-item').forEach(item => {
+                const label = item.querySelector('label');
+                const input = item.querySelector('input');
+                const language = label.textContent.replace(' Minimum:', '').trim();
+                values[language] = parseInt(input.value) || 42;
             });
             return values;
+        }
+
+        function getSelectedLanguages() {
+            const selected = [];
+            document.querySelectorAll('.language-checkboxes input:checked').forEach(cb => {
+                selected.push(cb.parentElement.textContent.trim());
+            });
+            return selected;
         }
 
         async function startScraping() {
@@ -646,11 +640,19 @@
             addLog('İstek sunucuya gönderiliyor...', 'info');
 
             const minimumValues = getMinimumValues();
+            const selectedLanguages = getSelectedLanguages();
+            if (selectedLanguages.length === 0) {
+                addLog('Hata: En az bir dil seçmelisiniz.', 'error');
+                updateButtonStates(false);
+                return;
+            }
+
             const formData = new FormData();
             formData.append('username', username);
             formData.append('password', password);
             formData.append('minimum_values', JSON.stringify(minimumValues));
-
+            formData.append('selected_languages', JSON.stringify(selectedLanguages));
+            
             try {
                 const response = await fetch('/start-scrape', { method: 'POST', body: formData });
                 if (!response.ok) throw new Error(`Sunucu hatası: ${response.statusText}`);
@@ -757,6 +759,27 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadMinimumValues();
             resetForm();
+
+            // --- Tümünü Seç / Kaldır mantığı ---
+            const selectAllCheckbox = document.getElementById('select-all-langs');
+            const langCheckboxes = document.querySelectorAll('#languageSelectContent .language-checkboxes input[type="checkbox"]:not(#select-all-langs)');
+
+            // Tümünü Seç kutusuna tıklandığında diğerlerini ayarla
+            selectAllCheckbox.addEventListener('change', () => {
+                langCheckboxes.forEach(cb => cb.checked = selectAllCheckbox.checked);
+            });
+
+            // Tek tek seçimlerde "Tümünü Seç" durumunu güncelle
+            langCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const allChecked = Array.from(langCheckboxes).every(c => c.checked);
+                    selectAllCheckbox.checked = allChecked;
+                });
+            });
+
+            // İlk yüklemede durum eşitleme (hepsi checked ise Tümünü Seç'i işaretle)
+            const initiallyAllChecked = Array.from(langCheckboxes).every(c => c.checked);
+            selectAllCheckbox.checked = initiallyAllChecked;
         });
     </script>
 </body>

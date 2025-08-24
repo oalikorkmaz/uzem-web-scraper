@@ -1,11 +1,14 @@
 # tasks.py
 import re
-from celery import Celery
 import time
 import os
+import datetime
+from zoneinfo import ZoneInfo
+from celery import Celery
 from scraper_refactored import UzemScraper 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Side, PatternFill
+
 
 celery_app = Celery('tasks', broker='redis://redis:6379/0', backend='redis://redis:6379/0')
 
@@ -15,7 +18,9 @@ def create_excel_report(data, minimum_values, task_id):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
     
-    filename = os.path.join(output_folder, f'{task_id}.xlsx')
+    now = datetime.datetime.now(ZoneInfo("Europe/Istanbul"))
+    timestamp = now.strftime("%d-%m-%Y_%H-%M")
+    filename = os.path.join(output_folder, f'UZEM_DOYK_{timestamp}.xlsx')
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = 'DOYK Analizi'
@@ -95,125 +100,169 @@ def create_excel_report(data, minimum_values, task_id):
     return filename
 
 @celery_app.task(bind=True)
-def start_scrape_process(self, username, password, minimum_values):
-    """Celery'nin ana görevi. Veri çeker, işler, ilerleme bildirir ve Excel oluşturur."""
+def start_scrape_process(self, username, password, minimum_values, selected_languages):
+    """
+    Celery ana görevi:
+      1) Giriş + linkleri çek
+      2) Hedef seviye sayfalarından kursları topla
+      3) TR+EN başlıklardan beceri (D/O/Y/K) tespiti yap
+      4) Excel raporunu üret
+      5) Tüm uyarı/teşhis mesajlarını HTML log-area'ya da ilet
+    """
+
+    # --- Yardımcılar ---
     def update_status(progress, message):
+        # Arayüze ilerleme + log mesajı gönder
         self.update_state(state='PROGRESS', meta={'progress': progress, 'log_message': message})
-        time.sleep(1)
+        # Çok hızlı ardışık update'lerde UI'nin yetişebilmesi için küçük gecikme
+        time.sleep(0.3)
+
+    def send_log_to_frontend(progress, message):
+        # Konsola da yaz, UI'ya da yolla
+        print(message)
+        update_status(progress, message)
+
+    # TR + EN eşleşme desenleri (başlık içi)
+    SKILL_PATTERNS = {
+        'D': [r'\bdinleme\b', r'\blistening\b'],
+        'O': [r'\bokuma\b', r'\breading\b'],
+        'Y': [r'\byazma\b', r'\bwriting\b'],
+        'K': [r'\bkonuşma\b', r'\bkonusma\b', r'\bspeaking\b'],
+    }
+    SKILL_FALLBACK_RE = re.compile(r'\b(reading|writing|listening|speaking)\s+skill(s)?\b', re.IGNORECASE)
+    SKILL_WORD_TO_CODE = {'reading': 'O', 'writing': 'Y', 'listening': 'D', 'speaking': 'K'}
+
+    def detect_skill_from_title(title: str):
+        t = (title or '').lower()
+        for code, pats in SKILL_PATTERNS.items():
+            for p in pats:
+                if re.search(p, t, re.IGNORECASE):
+                    return code
+        m = SKILL_FALLBACK_RE.search(t)
+        if m:
+            return SKILL_WORD_TO_CODE.get(m.group(1).lower())
+        return None
+
+    LEVEL_RE = re.compile(r'\b(A1|A2|B1|B2|C1|C2)\b', re.IGNORECASE)
+
+    # Hangi dilde hangi seviyeler işlenecek (gerekirse özelleştir)
+    allowed_levels_config = {
+        'İngilizce': ['A1', 'A2', 'B1', 'B2', 'C1'],
+        'default':   ['A1', 'A2', 'B1']
+    }
 
     scraper = None
     try:
-        update_status(10, 'Sistem başlatılıyor...')
+        # 1) Giriş
+        update_status(5, 'Sistem başlatılıyor...')
         scraper = UzemScraper(username, password)
-        
-        update_status(15, 'WebDriver bağlanıyor...')
-        if not scraper.connect_driver():
-            raise Exception("WebDriver başlatılamadı...")
 
-        update_status(20, 'Sisteme giriş yapılıyor...')
+        update_status(10, 'WebDriver bağlanıyor...')
+        if not scraper.connect_driver():
+            raise Exception("WebDriver başlatılamadı.")
+
+        update_status(15, 'Sisteme giriş yapılıyor...')
         if not scraper.login():
-            raise Exception("Giriş başarısız oldu...")
-        
+            raise Exception("Giriş başarısız. Lütfen kullanıcı adı/şifreyi kontrol edin.")
+
         update_status(30, 'Dil seviyesi linkleri çekiliyor...')
         language_data = scraper.get_language_level_links()
         if not language_data:
             raise Exception("Ana sayfadan dil seviyesi linkleri çekilemedi.")
 
-        ### BAŞLANGIÇ: Filtreleme Mantığı Düzeltmesi ###
-        
-        allowed_levels_config = {
-            'İngilizce': ['A1', 'A2', 'B1', 'B2', 'C1'],
-            'default': ['A1', 'A2', 'B1']
-        }
-        
-        all_scraped_courses = {}
-        
+        if selected_languages:
+            language_data = {lang: levels for lang, levels in language_data.items() if lang in selected_languages}
+            if not language_data:
+                raise Exception("Seçilen diller için link bulunamadı.")
+
+        # 2) İşlenecek seviye listesi
         levels_to_process = []
         for lang, levels in language_data.items():
             target_levels = allowed_levels_config.get(lang, allowed_levels_config['default'])
-            for level_name in levels.keys():
-                # YENİ EKLENEN KISIM: Seviye kodunu Regex ile arıyoruz.
-                match = re.search(r'\b(A1|A2|B1|B2|C1|C2)\b', level_name, re.IGNORECASE)
-                level_code = match.group(0).upper() if match else None
-
+            for level_name, level_url in levels.items():
+                m = LEVEL_RE.search(level_name or '')
+                level_code = (m.group(0).upper() if m else None)
                 if level_code and level_code in target_levels:
-                    levels_to_process.append({'lang': lang, 'level_name': level_name, 'level_url': levels[level_name]})
+                    levels_to_process.append({
+                        'lang': lang,
+                        'level_name': level_name,
+                        'level_code': level_code,
+                        'level_url': level_url
+                    })
                 else:
-                    # Bu log mesajı sayesinde hangi seviyelerin atlandığını görebiliriz.
-                    print(f"Atlanıyor: {level_name} (Hedef seviye değil veya seviye kodu bulunamadı)")
-
+                    send_log_to_frontend(28, f"[SKIP] Hedef dışı seviye: {lang} / '{level_name}' (izinli: {target_levels})")
 
         total_levels = len(levels_to_process)
-        processed_levels = 0
-        
-        update_status(40, f'Toplam {total_levels} hedef seviye bulundu. Kurslar taranıyor...')
+        if total_levels == 0:
+            raise Exception("İşlenecek uygun seviye bulunamadı.")
 
-        for item in levels_to_process:
-            lang, level_name, level_url = item['lang'], item['level_name'], item['level_url']
+        update_status(30, f'Toplam {total_levels} seviye için kurslar toplanacak...')
 
-            progress = 40 + int(50 * (processed_levels / total_levels)) if total_levels > 0 else 40
-            update_status(progress, f"İşleniyor: {lang} - {level_name}")
-            
+        # 3) Kursları topla (hafif yöntemlerle)
+        all_scraped_courses = {}  # {lang: {level_code: [ {title, url, total_resources_from_js}, ... ]}}
+        for idx, item in enumerate(levels_to_process, start=1):
+            lang, level_name, level_code, level_url = item['lang'], item['level_name'], item['level_code'], item['level_url']
+            prog = 30 + int(50 * (idx-1) / total_levels)
+            update_status(prog, f"İşleniyor: {lang} - {level_name} ({level_code})")
+
             if lang not in all_scraped_courses:
                 all_scraped_courses[lang] = {}
+            if level_code not in all_scraped_courses[lang]:
+                all_scraped_courses[lang][level_code] = []
 
-            courses_in_level = scraper.scrape_doyk_content(level_url)
-            if courses_in_level:
-                all_scraped_courses[lang][level_name] = courses_in_level
-            
-            processed_levels += 1
-            time.sleep(1)
+            courses_in_level = scraper.scrape_doyk_content(level_url) or []
+            if not courses_in_level:
+                send_log_to_frontend(prog, f"[WARN] Kurs bulunamadı: {lang} - {level_name} ({level_code})")
+            else:
+                all_scraped_courses[lang][level_code].extend(courses_in_level)
 
-        ### BİTİŞ: Filtreleme Mantığı Düzeltmesi ###
+        # 4) Gruplama (D/O/Y/K)
+        update_status(82, 'Veriler işleniyor (D/O/Y/K gruplanıyor)...')
 
-        update_status(90, 'Veriler işleniyor ve gruplanıyor...')
-        
-        # ... (fonksiyonun geri kalanı, veri işleme ve excel oluşturma kısımları aynı) ...
-        doyk_skill_map = {
-            "Dinleme Becerisi": "D", "Okuma Becerisi": "O",
-            "Yazma Becerisi": "Y", "Konuşma Becerisi": "K"
-        }
-        grouped_data_by_language = {}
+        grouped_data_by_language = {}  # {lang: {level_code: {'D':int,'O':int,'Y':int,'K':int}}}
+        for lang, levels_dict in all_scraped_courses.items():
+            lang_block = {}
+            for level_code, courses_list in levels_dict.items():
+                doyk_counts = {'D': 0, 'O': 0, 'Y': 0, 'K': 0}
+                for c in (courses_list or []):
+                    title = c.get('title', '') or ''
+                    total = int(c.get('total_resources_from_js', 0) or 0)
 
-        for lang_category, levels_dict in all_scraped_courses.items():
-            current_language_data = {}
-            for level_name, courses_list in levels_dict.items():
-                # YENİ EKLENEN KISIM: Seviye kodunu burada da Regex ile bulalım ki Excel'e doğru yazılsın
-                match = re.search(r'\b(A1|A2|B1|B2|C1|C2)\b', level_name, re.IGNORECASE)
-                current_level_code = match.group(0).upper() if match else level_name
-                
-                doyk_counts_for_level = {skill_code: 0 for skill_code in doyk_skill_map.values()}
+                    skill = detect_skill_from_title(title)
+                    if skill:
+                        # Aynı seviyede aynı beceriye birden fazla kurs varsa topluyoruz
+                        doyk_counts[skill] += total
+                    else:
+                        # Eşleşmeyen başlıkları UI'ya da gönder
+                        send_log_to_frontend(85, f"[WARN] Beceri eşleşmedi: {lang} {level_code} → '{title}' (total={total})")
 
-                for course_info in courses_list:
-                    course_title = course_info.get('title', '')
-                    total_resources = course_info.get('total_resources_from_js', 0)
-                    
-                    for full_skill_name, skill_code in doyk_skill_map.items():
-                        if full_skill_name in course_title:
-                            doyk_counts_for_level[skill_code] = total_resources
-                            break
-                
-                current_language_data[current_level_code] = doyk_counts_for_level
-            
-            if current_language_data:
-                grouped_data_by_language[lang_category] = current_language_data
+                lang_block[level_code] = doyk_counts
 
-        scraper.close_driver()
-        scraper = None
+            if lang_block:
+                grouped_data_by_language[lang] = lang_block
 
-        update_status(95, 'Excel raporu oluşturuluyor...')
+        # 5) Sürücüyü kapat + Excel
+        if scraper:
+            scraper.close_driver()
+            scraper = None
+
+        update_status(92, 'Excel raporu oluşturuluyor...')
         excel_file_path = create_excel_report(grouped_data_by_language, minimum_values, self.request.id)
 
+        update_status(100, 'Tamamlandı.')
         return {
             'status': 'SUCCESS',
             'data': grouped_data_by_language,
             'excel_filename': os.path.basename(excel_file_path)
         }
+
     except Exception as e:
         import traceback
         traceback.print_exc()
-        self.update_state(state='FAILURE', meta={'progress': 0, 'log_message': str(e)})
+        # Hata ayrıntısını UI'ya da gönder
+        self.update_state(state='FAILURE', meta={'progress': 0, 'log_message': f"Hata: {str(e)}"})
         return {'status': 'FAILURE', 'log_message': str(e)}
+
     finally:
         if scraper and scraper.driver:
             scraper.close_driver()
