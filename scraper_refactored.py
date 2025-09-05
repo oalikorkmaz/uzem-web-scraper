@@ -271,8 +271,10 @@ class UzemScraper:
                             const resources = doc.querySelectorAll('li.resource:not(:has(div.hiddenactivity))').length;
                             const h5pLis    = doc.querySelectorAll('li.h5pactivity:not(:has(div.hiddenactivity))').length;
                             const assigns   = doc.querySelectorAll('li.modtype_assign:not(:has(div.hiddenactivity))').length;
+                            const videos    = doc.querySelectorAll('div.video-js:has(video):not(:has(audio)):not(:has(.hiddenactivity))').length;
 
-                            const total = h5pDivs + resources + h5pLis + assigns;
+
+                            const total = h5pDivs + resources + h5pLis + assigns + videos;
                             results.push({ title: it.title || '', url: it.url, total });
                         } catch(e) {
                             results.push({ title: it.title || '', url: it.url, total: 0, error: String(e) });
@@ -310,4 +312,5 @@ class UzemScraper:
         """WebDriver'ı kapatır."""
         if self.driver:
             print("WebDriver kapatılıyor.")
+
             self.driver.quit()
